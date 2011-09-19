@@ -14,15 +14,25 @@ import numpy
 # define functions first
 def points2vector(coord1, coord2):
     """Calculate vector between two points."""
-    return [i - j for i, j in zip(coord1, coord2)]
+    #return [i - j for i, j in zip(coord1, coord2)]
+    # Twice as fast for 3d vectors
+    return [coord1[0] - coord2[0], coord1[1] - coord2[1], coord1[2] - coord2[2]]
 
 def dotproduct(vec1, vec2):
     """Calculate dot product for two vectors."""
-    return sum([i*j for i, j in zip(vec1, vec2)])
+    #return sum([i*j for i, j in zip(vec1, vec2)])
+    # Faster if we know it is 3d only
+    return vec1[0]*vec2[0] + vec1[1]*vec2[1] + vec1[2]*vec2[2]
+
+def length_squared(vec):
+    """Calculate squared magnitude of vector; 20% faster than with sqrt."""
+    return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 
 def length(vec):
     """Calculate magnitude of a vector."""
-    return dotproduct(vec, vec)** 0.5
+    #return sum([i*i for i in vec]) ** 0.5
+    # Faster if we know it is 3d only
+    return (vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])**0.5
 
 def theta(vec1, vec2):
     """Calculate angle between two vectors."""
@@ -102,6 +112,8 @@ distance_min = 0.0
 distance_max = 10.0
 distance_bin = 0.2
 distance_bins = int(math.ceil((distance_max - distance_min)/distance_bin)) + 1
+dist_min_sq = distance_min*distance_min
+dist_max_sq = distance_max*distance_max
 
 bins = [[0 for _i in range(angle_bins)] for _j in range(distance_bins)]
 axis_vector = [1, 0, 0]  # x-axis can change later?
@@ -132,15 +144,15 @@ for line in history:
             for atom in atoms:
                 # Calculate vector for Zn-Cx
                 to_atom = points2vector(ref, atom)
-                to_atom_dist = length(to_atom)
-                if distance_min < to_atom_dist < distance_max:
+                to_atom_dist_sq = length_squared(to_atom)
+                if dist_min_sq < to_atom_dist_sq < dist_max_sq:
                     to_atom_angle = theta(axis_vector, to_atom)
                     # FIXME(): when the vector is -axis_vector,
                     # theta is pi and does not fit in a bin
                     this_angle_bin = int(math.floor(
                         (to_atom_angle-angle_min)/angle_bin))
                     this_distance_bin = int(math.floor(
-                        (to_atom_dist-distance_min)/distance_bin))
+                        ((to_atom_dist_sq**0.5)-distance_min)/distance_bin))
                     bins[this_distance_bin][this_angle_bin] += 1
 
         # We have finished this timestep, move on to the next
@@ -152,8 +164,8 @@ for line in history:
 data_file = open('out_xyz.dat', 'wb')
 matrix_file = open('out_matrix.dat', 'wb')
 
-for distance_idx, distance_bin in enumerate(bins):
-    for angle_idx, bin_value in enumerate(distance_bin):
+for distance_idx, distance_bins in enumerate(bins):
+    for angle_idx, bin_value in enumerate(distance_bins):
         # Normalization of bins
         theta1 = (angle_idx * angle_bin) + angle_min
         theta2 = ((angle_idx + 1) * angle_bin) + angle_min
@@ -164,7 +176,7 @@ for distance_idx, distance_bin in enumerate(bins):
         bin_volume = spherical_sector(r2, h2) - spherical_sector(r1, h1)
         scaled_bin = bin_value / (bin_volume * total_references)
         #bins[distance_idx][angle_idx] = scaled_bin
-        data_file.write("%f %f %f\n" % (r1, theta1, scaled_bin))
+        data_file.write("%f %f %f\n" % (r1, rad2deg(theta1), scaled_bin))
         matrix_file.write("%f " % scaled_bin)
     data_file.write("\n")
     matrix_file.write("\n")
