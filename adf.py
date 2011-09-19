@@ -2,7 +2,8 @@
 
 """
 
-Calculate and bin the angles found between the cell vector and the Zn atom - guest atom vector.
+Calculate and bin the angles found between the cell vector and 
+the Zn atom - guest atom vector.
 
 """
 
@@ -31,31 +32,9 @@ def rad2deg(angle):
     """Calculate angle theta in degrees from radians."""
     return ([angle * (180 / math.pi)])
 
-def conevolume(theta, mag):
-    """Calculate volume of cone."""
-    return ([(1/3.0) * (math.pi) * (((math.sin(theta)) * mag) **2) * ((math.cos(theta)) * mag)])
-
-def images(atoms, cell):
-    """Make periodic images to fill up half a box width in each direction."""
-    # The 0, 0, 0 index will produce the input atoms
-    new_atoms = []
-    # The transpose is needed to work with the fractional coordinates
-    cell = numpy.array(cell).T
-    for atom in atoms:
-        # Fractional coordinates make this much easier
-        f_atom = numpy.linalg.solve(cell, atom)
-        # Permute on and off for each axis
-        for x_idx in [0, 1]:
-            # substitute for a conditional expression:  (b, a)[condition]
-            # same as:  a if condition else b
-            new_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0.5]
-            for y_idx in [0, 1]:
-                new_fy = f_atom[1] + y_idx*(+1, -1)[f_atom[1] > 0.5]
-                for z_idx in [0, 1]:
-                    new_fz = f_atom[2] + z_idx*(+1, -1)[f_atom[2] > 0.5]
-                    # note: convert back to list as that's what is expected now
-                    new_atoms.append(list(numpy.dot(cell, [new_fx, new_fy, new_fz])))
-    return new_atoms
+def sphericalsector(r, h):
+    """Calculate volume of an open spherical sector."""
+    return ([(2/3.0) * (math.pi) * ((r)**2) * (h)])
 
 
 #if len (sys.argv) == 1:
@@ -120,7 +99,8 @@ for line in history:
         next_ref = None
     elif 'timestep' in line:
         # process the last timestep before moving on
-        # make copies of 'reference' atoms that are within a certain distance of cell edge
+        # make copies of 'reference' atoms that are within a certain distance
+        # of cell edge
         print images(references, cell)
         for ref in references:
             for atom in atoms:
@@ -147,22 +127,29 @@ for line in history:
         atoms = []
         references = []
 
-
 # xyzdatafile = open(some XYZ data file)
 # matrixdatafile = open(some matrix data)
 
 for distance_idx, distance_bin in enumerate(bins):
     for angle_idx, bin_value in enumerate(distance_bin):
-        # scaling factor = whatever blah blah
-        # bins[distnace_idx][agnler_idx] = bin_value*normajhvblistion factor
-        # xyzdatafile.write("%f %f %f\n" % (R1, Theta1, scaled_bin_value)
-        # matrixdatafile.write("%f " % scaled_bin_value)
-    # xyzdatafile.write("\n")
-    # matrixdatafile.write("\n")
+        # Normalization of bins
+        theta1 = ((angle_idx * angle_bin) + angle_min)
+        theta2 = (((angle_idx + 1) * angle_bin) + angle_min)
+        r1 = ((distance_idx * distance_bin) + distance_min)
+        r2 = (((distance_idx + 1) * distance_bin) + distance_min)
+        h1 = ((r1 * (math.cos(theta1))) - (r1 * (math.cos(theta2))))
+        h2 = ((r2 * (math.cos(theta1))) - (r2 * (math.cos(theta2))))
+        scalingfactor = ((sphericalsector(r2, h2)) -
+        (sphericalsector(r1, h1))) 
+        bins[distance_idx][angle_idx] = bin_value * scalingfactor
+        xyzdatafile.write("%f %f %f\n" % (r1, theta1, scaled_bin_value)
+        matrixdatafile.write("%f " % scaled_bin_value)
+    xyzdatafile.write("\n")
+    matrixdatafile.write("\n")
 
 
 
-#adf_file = open(output_file, "w")
-#adf_file.writelines(xyz)
-#adf_file.close()
+for idx, bin in enumerate(bins):
+    # print bin/some_scaling_factor_depending_on_bin
+    print idx, bin
 
