@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+
+"""
+Submit an adf job to the queue on Wooki
+
+"""
+
+import os
+import optparse
+from subprocess import Popen, PIPE
+
+# -----------------------------------------------------------------------
+# Simple serial submissions script - python version
+#
+# 2011-09-20
+# -----------------------------------------------------------------------
+
+# Items in 'jobopts' are used to template the submit script
+jobopts = {}
+
+# -----------------------------------------------------------------------
+# Define the command-line Options using Python 'optparse'
+# -----------------------------------------------------------------------
+parser = optparse.OptionParser("usage: %prog [options] [input_file.in]")
+parser.add_option("-H", "--Host", action="store", type="string",
+                  dest="host_name",
+                  help="submit job to a specific host - doesn't always work ")
+parser.add_option("-m", "--mem", action="store", type="str", dest="min_mem",
+                  help="request minimum memory e.g. 3gb or 3000mb")
+parser.add_option("-a", "--attribute", action="store", type="string",
+                  dest="attribute",
+                  help="request node attribute eg. submit -a switch2:xeon")
+parser.add_option("-q", "--queue", action="store", type="str", dest="queue",
+                  help="specify a queue to run on")
+parser.add_option("-d", "--debug", action="store_true", dest="debug",
+                  help="don't submit job, print debugging info")
+(options, args) = parser.parse_args()
+
+
+# -----------------------------------------------------------------------
+def abort(message):
+    """Exit if something goes wrong"""
+    print(" * %s" % message)
+    print(">> No job submitted to queue")
+    raise SystemExit
+# -----------------------------------------------------------------------
+
+# ------------------------------------------------------
+# where are we?
+# ------------------------------------------------------
+jobdir = os.getcwd()
+jobopts["startdir"] = jobdir
+
+# -----------------------------------------------------------------------------
+# collect our pbs directives
+# -----------------------------------------------------------------------------
+
+PBS_directives = ["#PBS -m n", "#PBS -j oe "]
+
+# ------------------------------------------------------------------------
+# Read input_file name from command-line argument and check if it exists
+# ------------------------------------------------------------------------
+if len(args) == 0:
+    PBS_directives.append('#PBS -N adf_job')
+    PBS_directives.append('#PBS -o adf_job.out')
+    input_file = None
+    jobopts["jobname"] = 'adf_job'
+    jobopts['exe'] = '~tdaff/Compile/adf/adf.py'
+else:
+    input_file = args[0]
+    if not os.path.exists(input_file):
+        abort("Input file: %s not found." % (input_file))
+    PBS_directives.append('#PBS -N %s' % input_file)
+    PBS_directives.append('#PBS -o %s.out' % input_file)
+    jobopts["jobname"] = input_file
+    jobopts['exe'] = '~tdaff/Compile/adf/adf.py %s' % input_file
+
+# -----------------------------------------------------------------------------
+# single CPU job, just check for custom attributes, etc
+# -----------------------------------------------------------------------------
+if options.attribute:
+    print(">> Requesting the following node attribute: %s" % options.attribute)
+    PBS_directives.append("#PBS -l %s" % options.attribute)
+
+# ----------------------------------------------
+# -q --queue : specify a queue to run on
+# ----------------------------------------------
+if options.queue:
+    print(">> Submitting to queue: %s" % options.queue)
+    PBS_directives.append("#PBS -q %s" % options.queue)
+
+# ----------------------------------------------
+# -H --Hostname : specify the hostname to run on
+# ----------------------------------------------
+if options.host_name:
+    print(">> Attempting to submit to host: %s" % options.host_name)
+    PBS_directives.append("#PBS -l host=%s" % options.host_name)
+
+# -------------------------------------------------------------
+# -m --mem Memory options
+# -------------------------------------------------------------
+if options.min_mem:
+    print(">> Requesting node(s) with minimum memory of: %s" % options.min_mem)
+    PBS_directives.append("#PBS -l mem=%s" % options.min_mem)
+
+
+#******************************************************************************
+# QSUB bash script BEGIN
+#******************************************************************************
+line = """
+
+cd %(startdir)s
+
+echo $HOSTNAME >> $PBS_JOBID.stdout
+echo JOBID = $PBS_JOBID >> $PBS_JOBID.stdout
+
+date >> $PBS_JOBID.stdout
+
+export PYTHONUNBUFFERED=1
+
+%(exe)s >> $PBS_JOBID.stdout
+
+date >> $PBS_JOBID.stdout
+
+""" % jobopts
+#******************************************************************************
+# QSUB bash script END
+#******************************************************************************
+
+
+#-------------------------------------------------------------
+# Add the PBS directives to the qsub bash script and submit it
+#-------------------------------------------------------------
+line = "\n".join(PBS_directives) + "\n" + line
+if options.debug:
+    print line
+else:
+    submit = Popen("qsub", shell=False, stdin=PIPE)
+    submit.communicate(input=line)

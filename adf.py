@@ -202,7 +202,6 @@ for line in history:
         # of cell edge
         total_references += len(references)
         references = images(references, cell, rcell)
-        print references
         for ref in references:
             for atom in atoms:
                 # Calculate vector for Zn-Cx
