@@ -9,18 +9,14 @@ the Zn atom - guest atom vector.
 
 import ConfigParser
 import math
-import os
-import pprint
 import re
 import sys
 from StringIO import StringIO
 
-import numpy
-
 
 # define functions first
 def points2vector(coord1, coord2):
-    """Calculate vector between two points."""
+    """Calculate vector between two 3d points."""
     #return [i - j for i, j in zip(coord1, coord2)]
     # Twice as fast for fixed 3d vectors
     return [coord1[0] - coord2[0],
@@ -28,28 +24,35 @@ def points2vector(coord1, coord2):
             coord1[2] - coord2[2]]
 
 
-def dotproduct(vec1, vec2):
-    """Calculate dot product for two vectors."""
+def dot(vec1, vec2):
+    """Calculate dot product for two 3d vectors."""
     #return sum([i*j for i, j in zip(vec1, vec2)])
     # Faster if we know it is 3d only
     return vec1[0]*vec2[0] + vec1[1]*vec2[1] + vec1[2]*vec2[2]
 
 
+def cross(vec_1, vec_2):
+    """Calculate vector cross product for 3d vector."""
+    return [vec_1[1]*vec_2[2] - vec_1[2]*vec_2[1],
+            vec_1[2]*vec_2[0] - vec_1[0]*vec_2[2],
+            vec_1[0]*vec_2[1] - vec_1[1]*vec_2[0]]
+
+
 def length_squared(vec):
-    """Calculate squared magnitude of vector; 20% faster than with sqrt."""
+    """Calculate squared magnitude of 3d vector; 20% faster than with sqrt."""
     return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 
 
 def length(vec):
-    """Calculate magnitude of a vector."""
+    """Calculate magnitude of a 3d vector."""
     #return sum([i*i for i in vec]) ** 0.5
     # Faster if we know it is 3d only
     return (vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])**0.5
 
 
 def theta(vec1, vec2):
-    """Calculate angle between two vectors."""
-    return math.acos(dotproduct(vec1, vec2)/ (length(vec1)*length(vec2)))
+    """Calculate angle between two 3d vectors."""
+    return math.acos(dot(vec1, vec2)/ (length(vec1)*length(vec2)))
 
 
 def rad2deg(angle):
@@ -62,27 +65,28 @@ def spherical_sector(radius, height):
     return (2/3.0) * math.pi * (radius**2) * height
 
 
-def images(in_atoms, box):
+def images(in_atoms, box, rbox):
     """Make periodic images to fill up half a box width in each direction."""
     # The 0, 0, 0 index will produce the input atoms
     new_atoms = []
-    # The transpose is needed to work with the fractional coordinates
-    box = numpy.array(box).T
-    for cart_atom in in_atoms:
+    for cart in in_atoms:
         # Fractional coordinates make this much easier
-        f_atom = list(numpy.linalg.solve(box, numpy.array(cart_atom)))
+        f_atom = [dot(cart, rbox[0]),
+                  dot(cart, rbox[1]),
+                  dot(cart, rbox[2])]
         # Permute on and off for each axis
         for x_idx in [0, 1]:
             # substitute for a conditional expression:  (b, a)[condition]
             # same as:  a if condition else b
-            new_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0.5]
+            n_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0.5]
             for y_idx in [0, 1]:
-                new_fy = f_atom[1] + y_idx*(+1, -1)[f_atom[1] > 0.5]
+                n_fy = f_atom[1] + y_idx*(+1, -1)[f_atom[1] > 0.5]
                 for z_idx in [0, 1]:
-                    new_fz = f_atom[2] + z_idx*(+1, -1)[f_atom[2] > 0.5]
-                    # note: convert back to list as that's what is expected now
-                    new_atoms.append(list(numpy.dot(box,
-                                                    [new_fx, new_fy, new_fz])))
+                    n_fz = f_atom[2] + z_idx*(+1, -1)[f_atom[2] > 0.5]
+                    pos = [n_fx*box[0][0] + n_fy*box[1][0] + n_fz*box[2][0],
+                           n_fx*box[0][1] + n_fy*box[1][1] + n_fz*box[2][1],
+                           n_fx*box[0][2] + n_fy*box[1][2] + n_fz*box[2][2]]
+                    new_atoms.append(pos)
     return new_atoms
 
 
@@ -95,7 +99,7 @@ config_defaults = {
     'direction': '[1, 0, 0]',
     'angle_bins': '90',
     'cutoff': '12.5',
-    'spacing' : '0.1'
+    'spacing': '0.1'
 }
 
 # source the input from a file or stdin
@@ -143,10 +147,16 @@ else:
 
 # Obtain the cell vector
 # Cell vector changes not considered during simulation
-
 cell = [[float(x) for x in history.readline().split()],
         [float(x) for x in history.readline().split()],
         [float(x) for x in history.readline().split()]]
+
+# Inverse of cell for images()
+det_cell = dot(cell[0], cross(cell[1], cell[2]))
+rcell = [[x/det_cell for x in cross(cell[1], cell[2])],
+         [x/det_cell for x in cross(cell[2], cell[0])],
+         [x/det_cell for x in cross(cell[0], cell[1])]]
+
 
 atoms = []
 references = []
@@ -191,7 +201,8 @@ for line in history:
         # make copies of 'reference' atoms that are within a certain distance
         # of cell edge
         total_references += len(references)
-        references = images(references, cell)
+        references = images(references, cell, rcell)
+        print references
         for ref in references:
             for atom in atoms:
                 # Calculate vector for Zn-Cx
@@ -245,6 +256,6 @@ for distance_idx, distance_bins in enumerate(bins):
     matrix_file.write("\n")
 
 
-for idx, bin_contents in enumerate(bins):
+#for idx, bin_contents in enumerate(bins):
     # print bin/some_scaling_factor_depending_on_bin
-    print idx, bin_contents
+#    print idx, bin_contents
