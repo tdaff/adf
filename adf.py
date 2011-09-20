@@ -7,16 +7,26 @@ the Zn atom - guest atom vector.
 
 """
 
-import sys
+import ConfigParser
 import math
+import os
+import pprint
+import re
+import sys
+from StringIO import StringIO
+
 import numpy
+
 
 # define functions first
 def points2vector(coord1, coord2):
     """Calculate vector between two points."""
     #return [i - j for i, j in zip(coord1, coord2)]
-    # Twice as fast for 3d vectors
-    return [coord1[0] - coord2[0], coord1[1] - coord2[1], coord1[2] - coord2[2]]
+    # Twice as fast for fixed 3d vectors
+    return [coord1[0] - coord2[0],
+            coord1[1] - coord2[1],
+            coord1[2] - coord2[2]]
+
 
 def dotproduct(vec1, vec2):
     """Calculate dot product for two vectors."""
@@ -24,9 +34,11 @@ def dotproduct(vec1, vec2):
     # Faster if we know it is 3d only
     return vec1[0]*vec2[0] + vec1[1]*vec2[1] + vec1[2]*vec2[2]
 
+
 def length_squared(vec):
     """Calculate squared magnitude of vector; 20% faster than with sqrt."""
     return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
+
 
 def length(vec):
     """Calculate magnitude of a vector."""
@@ -34,17 +46,21 @@ def length(vec):
     # Faster if we know it is 3d only
     return (vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])**0.5
 
+
 def theta(vec1, vec2):
     """Calculate angle between two vectors."""
     return math.acos(dotproduct(vec1, vec2)/ (length(vec1)*length(vec2)))
+
 
 def rad2deg(angle):
     """Calculate angle theta in degrees from radians."""
     return angle * (180 / math.pi)
 
+
 def spherical_sector(radius, height):
     """Calculate volume of an open spherical sector."""
     return (2/3.0) * math.pi * (radius**2) * height
+
 
 def images(in_atoms, box):
     """Make periodic images to fill up half a box width in each direction."""
@@ -54,7 +70,7 @@ def images(in_atoms, box):
     box = numpy.array(box).T
     for cart_atom in in_atoms:
         # Fractional coordinates make this much easier
-        f_atom = numpy.linalg.solve(box, cart_atom)
+        f_atom = list(numpy.linalg.solve(box, numpy.array(cart_atom)))
         # Permute on and off for each axis
         for x_idx in [0, 1]:
             # substitute for a conditional expression:  (b, a)[condition]
@@ -69,32 +85,64 @@ def images(in_atoms, box):
                                                     [new_fx, new_fy, new_fz])))
     return new_atoms
 
-#if len (sys.argv) == 1:
-#    input_file = "HISTORY"
-#    output_file = "ADFCOORDS"
-#elif len(sys.argv) == 2:
-#    input_file = sys.argv[1]
-#    output_file = "ADFCOORDS"
-#elif len (sys.argv) == 3:
-#    input_file = sys.argv[1]
-#    output_file = sys.argv[2]
-#else:
-#    print "Incorrect submission format.  Please try again."
 
-history = open('HISTORY', 'r')
+# Use ConfigParser to deal with piped input file
+config_defaults = {
+    'input_file_name': 'HISTORY',
+    'output_prefix': 'adf',
+    'reference': 'Zn',
+    'seek_atom': 'Cx',
+    'direction': '[1, 0, 0]',
+    'angle_bins': '90',
+    'cutoff': '12.5',
+    'spacing' : '0.1'
+}
 
-reference = 'Zn'
-seek_atom = 'Cx'
+# source the input from a file or stdin
+if len(sys.argv) == 1:
+    config_lines = StringIO('[config]\n')
+    print("Using default config")
+elif len(sys.argv) == 2:
+    if '-' in sys.argv:
+        print("Reading config from stdin (Ctrl-D to finish)")
+        config_lines = StringIO('[config]\n' + sys.stdin.read())
+    else:
+        print("Reading config file %s" % sys.argv[1])
+        config_lines = StringIO('[config]\n' + open(sys.argv[1]).read())
+else:
+    # Only print usage if command line is not valid
+    print("Usage:\n\t%(prog)s input.in"
+          "\n\t%(prog)s - [to read from stdin]"
+          "\n\t%(prog)s [to use defaults]"
+          % {'prog': sys.argv[0]})
+    print("\ndefaults:\n")
+    for key, val in sorted(config_defaults.iteritems()):
+        print "%s = %s" % (key, val)
+    raise SystemExit
+
+config = ConfigParser.SafeConfigParser(defaults=config_defaults)
+# config needs a header so has been added to a file-like object
+config.readfp(config_lines)
+
+# Start the file processing here
+print("Starting processing")
+history = open(config.get('config', 'input_file_name'), 'r')
+
+reference = config.get('config', 'reference')
+seek_atom = config.get('config', 'seek_atom')
 
 first_line = history.readline()
 
 if not 'timestep' in first_line:
     # This file has a header or a first line which is not timestep
+    file_header = first_line.strip()
     history.readline()
     history.readline()
+else:
+    file_header = "HISTORY file"
 
 # Obtain the cell vector
-# Cellvector cannot change!
+# Cell vector changes not considered during simulation
 
 cell = [[float(x) for x in history.readline().split()],
         [float(x) for x in history.readline().split()],
@@ -104,19 +152,23 @@ atoms = []
 references = []
 
 angle_min = 0
-angle_max = ((math.pi))
-angle_bin = ((math.pi) / 18)
+angle_max = math.pi
+angle_bin = math.pi / config.getint('config', 'angle_bins')
 angle_bins = int(math.ceil((angle_max - angle_min)/angle_bin)) + 1
 
 distance_min = 0.0
-distance_max = 10.0
-distance_bin = 0.2
+distance_max = config.getfloat('config', 'cutoff')
+distance_bin = config.getfloat('config', 'spacing')
 distance_bins = int(math.ceil((distance_max - distance_min)/distance_bin)) + 1
+
+# Use squared distances for comparisons so only do sqrt for required atoms
 dist_min_sq = distance_min*distance_min
 dist_max_sq = distance_max*distance_max
 
 bins = [[0 for _i in range(angle_bins)] for _j in range(distance_bins)]
-axis_vector = [1, 0, 0]  # x-axis can change later?
+# regex magic to guess a list from a string
+axis_vector = config.get('config', 'direction')
+axis_vector = [float(x) for x in re.split('[\s,\(\)\[\]]*', axis_vector) if x]
 
 next_ref = None
 next_atom = None
@@ -161,8 +213,19 @@ for line in history:
         atoms = []
         references = []
 
-data_file = open('out_xyz.dat', 'wb')
-matrix_file = open('out_matrix.dat', 'wb')
+
+# Done reading
+print("\nWriting output")
+
+header = [
+    "# %s\n" % file_header,
+    "# direction: %s\n" % (axis_vector,),
+]
+
+data_file = open('adf_%s_%s.dat' % (reference, seek_atom), 'wb')
+matrix_file = open('adf_%s_%s_matrix.dat' % (reference, seek_atom), 'wb')
+data_file.writelines(header)
+matrix_file.writelines(header)
 
 for distance_idx, distance_bins in enumerate(bins):
     for angle_idx, bin_value in enumerate(distance_bins):
@@ -175,12 +238,11 @@ for distance_idx, distance_bins in enumerate(bins):
         h2 = (r2 * math.cos(theta1)) - (r2 * math.cos(theta2))
         bin_volume = spherical_sector(r2, h2) - spherical_sector(r1, h1)
         scaled_bin = bin_value / (bin_volume * total_references)
-        #bins[distance_idx][angle_idx] = scaled_bin
+        bins[distance_idx][angle_idx] = scaled_bin
         data_file.write("%f %f %f\n" % (r1, rad2deg(theta1), scaled_bin))
         matrix_file.write("%f " % scaled_bin)
     data_file.write("\n")
     matrix_file.write("\n")
-
 
 
 for idx, bin_contents in enumerate(bins):
