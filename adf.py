@@ -232,8 +232,9 @@ header = [
     "# direction: %s\n" % (axis_vector,),
 ]
 
-data_file = open('adf_%s_%s.dat' % (reference, seek_atom), 'wb')
-matrix_file = open('adf_%s_%s_matrix.dat' % (reference, seek_atom), 'wb')
+out_prefix = config.get('config', 'output_prefix')
+data_file = open('%s_%s_%s.dat' % (out_prefix, reference, seek_atom), 'wb')
+matrix_file = open('%s_%s_%s_matrix.dat' % (out_prefix, reference, seek_atom), 'wb')
 data_file.writelines(header)
 matrix_file.writelines(header)
 
