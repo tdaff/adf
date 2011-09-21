@@ -19,9 +19,9 @@ def points2vector(coord1, coord2):
     """Calculate vector between two 3d points."""
     #return [i - j for i, j in zip(coord1, coord2)]
     # Twice as fast for fixed 3d vectors
-    return [coord1[0] - coord2[0],
-            coord1[1] - coord2[1],
-            coord1[2] - coord2[2]]
+    return [coord2[0] - coord1[0],
+            coord2[1] - coord1[1],
+            coord2[2] - coord1[2]]
 
 
 def dot(vec1, vec2):
