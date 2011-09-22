@@ -76,7 +76,7 @@ def images(in_atoms, box, rbox):
                   dot(cart, rbox[2])]
         # Permute on and off for each axis
         for x_idx in [0, 1]:
-            # substitute for a conditional expression:  (b, a)[condition]
+            # substitute for a conditional expression: (b, a)[condition]
             # same as:  a if condition else b
             n_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0.5]
             for y_idx in [0, 1]:
@@ -128,13 +128,23 @@ config = ConfigParser.SafeConfigParser(defaults=config_defaults)
 # config needs a header so has been added to a file-like object
 config.readfp(config_lines)
 
+# Is reference a single atom?
+reference = config.get('config', 'reference')
+try:
+    # If it is a nice (float, float, float), probably a position
+    reference = [float(x) for x in re.split('[\s,\(\)\[\]]*', reference) if x]
+    references = [reference]
+    reference = None
+except ValueError:
+    # assume reference is an atom type
+    references = []
+
+# always an atom type
+seek_atom = config.get('config', 'seek_atom')
+
 # Start the file processing here
 print("Starting processing")
 history = open(config.get('config', 'input_file_name'), 'r')
-
-reference = config.get('config', 'reference')
-seek_atom = config.get('config', 'seek_atom')
-
 first_line = history.readline()
 
 if not 'timestep' in first_line:
@@ -159,7 +169,6 @@ rcell = [[x/det_cell for x in cross(cell[1], cell[2])],
 
 
 atoms = []
-references = []
 
 angle_min = 0
 angle_max = math.pi
@@ -180,37 +189,29 @@ bins = [[0 for _i in range(angle_bins)] for _j in range(distance_bins)]
 axis_vector = config.get('config', 'direction')
 axis_vector = [float(x) for x in re.split('[\s,\(\)\[\]]*', axis_vector) if x]
 
-next_ref = None
-next_atom = None
+#next_ref = None
+#next_atom = None
 
 total_references = 0
 
 for line in history:
     if seek_atom in line:
-        next_atom = line.split()[0]
-    elif next_atom is not None:
-        atoms.append([float(x) for x in line.split()])
-        next_atom = None
-    elif reference in line:
-        next_ref = line.split()[0]
-    elif next_ref is not None:
-        references.append([float(x) for x in line.split()])
-        next_ref = None
+        atoms.append([float(x) for x in history.next().split()])
+    elif reference is not None and reference in line:
+        references.append([float(x) for x in history.next().split()])
     elif 'timestep' in line:
         # process the last timestep before moving on
         # make copies of 'reference' atoms that are within a certain distance
         # of cell edge
         total_references += len(references)
-        references = images(references, cell, rcell)
-        for ref in references:
+        super_refs = images(references, cell, rcell)
+        for ref in super_refs:
             for atom in atoms:
                 # Calculate vector for Zn-Cx
                 to_atom = points2vector(ref, atom)
                 to_atom_dist_sq = length_squared(to_atom)
                 if dist_min_sq < to_atom_dist_sq < dist_max_sq:
                     to_atom_angle = theta(axis_vector, to_atom)
-                    # FIXME(): when the vector is -axis_vector,
-                    # theta is pi and does not fit in a bin
                     this_angle_bin = int(math.floor(
                         (to_atom_angle-angle_min)/angle_bin))
                     this_distance_bin = int(math.floor(
@@ -221,7 +222,8 @@ for line in history:
         timestep = line.split()[1]
         print "Processing timestep %s\r" % timestep,
         atoms = []
-        references = []
+        if reference is not None:
+            references = []
 
 
 # Done reading
@@ -232,9 +234,18 @@ header = [
     "# direction: %s\n" % (axis_vector,),
 ]
 
-out_prefix = config.get('config', 'output_prefix')
-data_file = open('%s_%s_%s.dat' % (out_prefix, reference, seek_atom), 'wb')
-matrix_file = open('%s_%s_%s_matrix.dat' % (out_prefix, reference, seek_atom), 'wb')
+if reference is None:
+    reference = ''.join(['%s' % int(x) for x in references[0]])
+else:
+    reference = '_%s' % reference
+
+min_v = min([abs(x) for x in axis_vector])
+axis = ''.join(['%s' % int(x/min_v) for x in axis_vector])
+
+out_prefix = '%s_%s_%s_%s' % (config.get('config', 'output_prefix'),
+                           reference, axis, seek_atom)
+data_file = open('%s.dat' % out_prefix, 'wb')
+matrix_file = open('%s_matrix.dat' % out_prefix, 'wb')
 data_file.writelines(header)
 matrix_file.writelines(header)
 
@@ -254,8 +265,3 @@ for distance_idx, distance_bins in enumerate(bins):
         matrix_file.write("%f " % scaled_bin)
     data_file.write("\n")
     matrix_file.write("\n")
-
-
-#for idx, bin_contents in enumerate(bins):
-    # print bin/some_scaling_factor_depending_on_bin
-#    print idx, bin_contents
