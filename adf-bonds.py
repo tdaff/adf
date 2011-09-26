@@ -9,7 +9,6 @@ the Zn atom - guest atom vector.
 
 import ConfigParser
 import math
-import re
 import sys
 from StringIO import StringIO
 
@@ -90,16 +89,20 @@ def images(in_atoms, box, rbox):
     return new_atoms
 
 
+def stdev(items):
+    """Calculate standard deviation of a population."""
+    mean = sum(items)/len(items)
+    return (sum([(i-mean)**2 for i in items])/len(items))**0.5
+
+
 # Use ConfigParser to deal with piped input file
 config_defaults = {
     'input_file_name': 'HISTORY',
     'output_prefix': 'adf',
-    'reference': 'Zn',
+    'datafile': 'references_Zn_N',
     'seek_atom': 'Cx',
-    'direction': '[1, 0, 0]',
     'angle_bins': '90',
-    'cutoff': '12.5',
-    'spacing': '0.1'
+    'cutoff': '10.0'
 }
 
 # source the input from a file or stdin
@@ -127,17 +130,6 @@ else:
 config = ConfigParser.SafeConfigParser(defaults=config_defaults)
 # config needs a header so has been added to a file-like object
 config.readfp(config_lines)
-
-# Is reference a single atom?
-reference = config.get('config', 'reference')
-try:
-    # If it is a nice (float, float, float), probably a position
-    reference = [float(x) for x in re.split('[\s,\(\)\[\]]*', reference) if x]
-    references = [reference]
-    reference = None
-except ValueError:
-    # assume reference is an atom type
-    references = []
 
 # always an atom type
 seek_atom = config.get('config', 'seek_atom')
@@ -177,53 +169,47 @@ angle_bins = int(math.ceil((angle_max - angle_min)/angle_bin)) + 1
 
 distance_min = 0.0
 distance_max = config.getfloat('config', 'cutoff')
-distance_bin = config.getfloat('config', 'spacing')
-distance_bins = int(math.ceil((distance_max - distance_min)/distance_bin)) + 1
 
 # Use squared distances for comparisons so only do sqrt for required atoms
 dist_min_sq = distance_min*distance_min
 dist_max_sq = distance_max*distance_max
 
-bins = [[0 for _i in range(angle_bins)] for _j in range(distance_bins)]
-# regex magic to guess a list from a string
-axis_vector = config.get('config', 'direction')
-axis_vector = [float(x) for x in re.split('[\s,\(\)\[\]]*', axis_vector) if x]
+datafile_name = config.get('config', 'datafile')
+datafile = __import__(datafile_name)
+references = {}
 
-#next_ref = None
-#next_atom = None
+for ref, directions in datafile.references.iteritems():
+    references[ref] = {}
+    for direction in directions:
+        references[ref][direction] = [0 for _i in range(angle_bins)]
 
-total_references = 0
+images = datafile.images
+
+total_steps = 0
 
 for line in history:
     if seek_atom in line:
         atoms.append([float(x) for x in history.next().split()])
-    elif reference is not None and reference in line:
-        references.append([float(x) for x in history.next().split()])
     elif 'timestep' in line:
         # process the last timestep before moving on
-        # make copies of 'reference' atoms that are within a certain distance
-        # of cell edge
-        total_references += len(references)
-        super_refs = images(references, cell, rcell)
-        for ref in super_refs:
-            for atom in atoms:
-                # Calculate vector for Zn-Cx
-                to_atom = points2vector(ref, atom)
-                to_atom_dist_sq = length_squared(to_atom)
-                if dist_min_sq < to_atom_dist_sq < dist_max_sq:
-                    to_atom_angle = theta(axis_vector, to_atom)
-                    this_angle_bin = int(math.floor(
-                        (to_atom_angle-angle_min)/angle_bin))
-                    this_distance_bin = int(math.floor(
-                        ((to_atom_dist_sq**0.5)-distance_min)/distance_bin))
-                    bins[this_distance_bin][this_angle_bin] += 1
+        total_steps += 1
+        for ref in references:
+            for image in images[ref]:
+                for direction in references[ref]:
+                    for atom in atoms:
+                        # Calculate vector for Zn-Cx
+                        to_atom = points2vector(image, atom)
+                        to_atom_dist_sq = length_squared(to_atom)
+                        if dist_min_sq < to_atom_dist_sq < dist_max_sq:
+                            to_atom_angle = theta(direction, to_atom)
+                            this_angle_bin = int(math.floor(
+                                (to_atom_angle-angle_min)/angle_bin))
+                            references[ref][direction][this_angle_bin] += 1
 
         # We have finished this timestep, move on to the next
         timestep = line.split()[1]
         print "Processing timestep %s\r" % timestep,
         atoms = []
-        if reference is not None:
-            references = []
 
 
 # Done reading
@@ -231,37 +217,37 @@ print("\nWriting output")
 
 header = [
     "# %s\n" % file_header,
-    "# direction: %s\n" % (axis_vector,),
+    "atom direction ",
+    " ".join(["%f" % rad2deg((idx * angle_bin) + angle_min)
+              for idx in range(angle_bins)]),
+    "\n"
 ]
 
-if reference is None:
-    reference = ''.join(['%s' % int(x) for x in references[0]])
-else:
-    reference = '%s' % reference
-
-min_v = min([abs(x) for x in axis_vector])
-axis = ''.join(['%s' % int(x/min_v) for x in axis_vector])
-
-out_prefix = '%s_%s_%s_%s' % (config.get('config', 'output_prefix'),
-                           reference, axis, seek_atom)
-data_file = open('%s.dat' % out_prefix, 'wb')
-matrix_file = open('%s_matrix.dat' % out_prefix, 'wb')
+data_file = open('%s_%s.dat' % (datafile_name, seek_atom), 'wb')
 data_file.writelines(header)
-matrix_file.writelines(header)
 
-for distance_idx, distance_bins in enumerate(bins):
-    for angle_idx, bin_value in enumerate(distance_bins):
-        # Normalization of bins
-        theta1 = (angle_idx * angle_bin) + angle_min
-        theta2 = ((angle_idx + 1) * angle_bin) + angle_min
-        r1 = (distance_idx * distance_bin) + distance_min
-        r2 = ((distance_idx + 1) * distance_bin) + distance_min
-        h1 = (r1 * math.cos(theta1)) - (r1 * math.cos(theta2))
-        h2 = (r2 * math.cos(theta1)) - (r2 * math.cos(theta2))
-        bin_volume = spherical_sector(r2, h2) - spherical_sector(r1, h1)
-        scaled_bin = bin_value / (bin_volume * total_references)
-        bins[distance_idx][angle_idx] = scaled_bin
-        data_file.write("%f %f %f\n" % (r1, rad2deg(theta1), scaled_bin))
-        matrix_file.write("%f " % scaled_bin)
+for ref in references:
+    bins = []
+    for direction in references[ref]:
+        d_bin = []
+        for angle_idx, bin_value in enumerate(references[ref][direction]):
+            # Normalization of bins
+            theta1 = (angle_idx * angle_bin) + angle_min
+            theta2 = ((angle_idx + 1) * angle_bin) + angle_min
+            r1 = distance_min
+            r2 = distance_max
+            h1 = (r1 * math.cos(theta1)) - (r1 * math.cos(theta2))
+            h2 = (r2 * math.cos(theta1)) - (r2 * math.cos(theta2))
+            bin_volume = spherical_sector(r2, h2) - spherical_sector(r1, h1)
+            scaled_bin = bin_value / (bin_volume * total_steps)
+            d_bin.append(scaled_bin)
+        data_file.write("(%f,%f,%f) " % ref)
+        data_file.write("(%f,%f,%f) " % direction)
+        data_file.write(" ".join(["%f" % x for x in d_bin]))
+        data_file.write("\n")
+        bins.append(d_bin)
+    data_file.write("(%f,%f,%f) " % ref)
+    data_file.write("stdev ")
+    for all_directions in zip(*bins):
+        data_file.write("%f " % stdev(all_directions))
     data_file.write("\n")
-    matrix_file.write("\n")
