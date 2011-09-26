@@ -173,23 +173,17 @@ refs_out = ["\nreferences = {\n"]
 
 images_out = ["\nimages = {\n"]
 
-adfs_out = ["\nadfs = {\n"]
-
 for ref, bonds in sorted(references.iteritems()):
     refs_out.append("    (%f, %f, %f): [\n" % ref)
     for bond in bonds:
-        refs_out.append("        [%f, %f, %f],\n" % tuple(bond))
+        refs_out.append("        (%f, %f, %f),\n" % tuple(bond))
     refs_out.append("    ],\n")
     images_out.append("    (%f, %f, %f): [\n" % ref)
     for image in images([ref], cell, rcell):
         images_out.append("        [%f, %f, %f],\n" % tuple(image))
     images_out.append("    ],\n")
-    adfs_out.append("    (%f, %f, %f): [],\n" % ref)
 
-file_out = (header +
-            refs_out + ["}\n"] +
-            images_out + ["}\n"] +
-            adfs_out + ["}\n"])
+file_out = (header + refs_out + ["}\n"] + images_out + ["}\n"])
 
 out_prefix = '%s_%s_%s' % (config.get('config', 'output_prefix'),
                            reference, seek_atom)
