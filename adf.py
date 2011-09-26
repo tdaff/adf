@@ -237,7 +237,7 @@ header = [
 if reference is None:
     reference = ''.join(['%s' % int(x) for x in references[0]])
 else:
-    reference = '_%s' % reference
+    reference = '%s' % reference
 
 min_v = min([abs(x) for x in axis_vector])
 axis = ''.join(['%s' % int(x/min_v) for x in axis_vector])
