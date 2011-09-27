@@ -95,6 +95,15 @@ def stdev(items):
     return (sum([(i-mean)**2 for i in items])/len(items))**0.5
 
 
+def rstdev(items):
+    """Calculate standard deviation of a population."""
+    mean = sum(items)/len(items)
+    try:
+        return ((sum([(i-mean)**2 for i in items])/len(items))**0.5)/mean
+    except ZeroDivisionError:
+        return 0.0
+
+
 # Use ConfigParser to deal with piped input file
 config_defaults = {
     'input_file_name': 'HISTORY',
@@ -250,4 +259,9 @@ for ref in references:
     data_file.write("stdev ")
     for all_directions in zip(*bins):
         data_file.write("%f " % stdev(all_directions))
+    data_file.write("\n")
+    data_file.write("(%f,%f,%f) " % ref)
+    data_file.write("rstdev ")
+    for all_directions in zip(*bins):
+        data_file.write("%f " % rstdev(all_directions))
     data_file.write("\n")
