@@ -1,0 +1,18 @@
+adf.py
+======
+
+Calculate spatial distributions of atom types by angle.
+
+
+Two flavours:
+
+   adf.py
+      spatially decomposed to single reference direction and 
+      averaged over all atoms
+
+   adf-bonds.py
+      referenced to symmetry directions (derived with bondseek.py)
+      and deviation averaged over all atoms
+
+
+ -- BP; TD
