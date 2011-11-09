@@ -6,13 +6,35 @@ Calculate spatial distributions of atom types by angle.
 
 Two flavours:
 
-   adf.py
-      spatially decomposed to single reference direction and 
-      averaged over all atoms
+ * adf.py
+      Spatially decomposed to single reference direction and 
+      averaged over all atoms.
 
-   adf-bonds.py
-      referenced to symmetry directions (derived with bondseek.py)
-      and deviation averaged over all atoms
+ * adf-bonds.py
+      Referenced to symmetry directions (derived with bondseek.py)
+      and deviation averaged over all atoms.
+
+      First run bondseek.py to generate the bonding directions from 
+      the first step of the HISTORY file. Input file takes the 
+      following options:
+      
+       * input_file_name: HISTORY
+       * output_prefix: references
+       * reference: Zn
+       * seek_atom: N
+       * cutoff: 2.5
+
+      The output is a 'references_Zn_N.py' file imported by adf-bonds.py.
+      The options for adf-bonds.py are:
+
+       * input_file_name: HISTORY
+       * output_prefix: adf
+       * datafile: references_Zn_N
+       * seek_atom: Cx
+       * angle_bins: 90
+       * cutoff: 10.0
 
 
- -- BP; TD
+-- 
+
+__authors__ = "BP & TD 2011"
