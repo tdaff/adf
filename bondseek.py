@@ -55,11 +55,11 @@ def images(in_atoms, box, rbox):
         for x_idx in [0, 1]:
             # substitute for a conditional expression: (b, a)[condition]
             # same as:  a if condition else b
-            n_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0.5]
+            n_fx = f_atom[0] + x_idx*(+1, -1)[f_atom[0] > 0]
             for y_idx in [0, 1]:
-                n_fy = f_atom[1] + y_idx*(+1, -1)[f_atom[1] > 0.5]
+                n_fy = f_atom[1] + y_idx*(+1, -1)[f_atom[1] > 0]
                 for z_idx in [0, 1]:
-                    n_fz = f_atom[2] + z_idx*(+1, -1)[f_atom[2] > 0.5]
+                    n_fz = f_atom[2] + z_idx*(+1, -1)[f_atom[2] > 0]
                     pos = [n_fx*box[0][0] + n_fy*box[1][0] + n_fz*box[2][0],
                            n_fx*box[0][1] + n_fy*box[1][1] + n_fz*box[2][1],
                            n_fx*box[0][2] + n_fy*box[1][2] + n_fz*box[2][2]]
@@ -143,9 +143,9 @@ dist_max_sq = distance_max*distance_max
 references = {}
 
 for line in history:
-    if seek_atom in line:
+    if line.split()[0] == seek_atom:
         atoms.append([float(x) for x in history.next().split()])
-    elif reference in line:
+    elif line.split()[0] == reference:
         references[tuple([float(x) for x in history.next().split()])] = []
     elif 'timestep' in line:
         # process the last timestep before moving on
