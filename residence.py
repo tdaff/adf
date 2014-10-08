@@ -12,14 +12,11 @@ import math
 import sys
 from StringIO import StringIO
 
-# These are about twice as fast, script is still slow
-import pyximport
-pyximport.install()
-from cfuncs import points_to_vector, length_squared
+from scipy.spatial import KDTree
 
 
 # define functions first
-def points2vector(coord1, coord2):
+def points_to_vector(coord1, coord2):
     """Calculate vector between two 3d points."""
     #return [i - j for i, j in zip(coord1, coord2)]
     # Twice as fast for fixed 3d vectors
@@ -42,9 +39,9 @@ def cross(vec_1, vec_2):
             vec_1[0]*vec_2[1] - vec_1[1]*vec_2[0]]
 
 
-#def length_squared(vec):
-#    """Calculate squared magnitude of 3d vector; 20% faster than with sqrt."""
-#    return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
+def length_squared(vec):
+    """Calculate squared magnitude of 3d vector; 20% faster than with sqrt."""
+    return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 
 
 def length(vec):
@@ -204,7 +201,7 @@ def process(config):
         elif line.split()[0] == base_atom:
             # Make images of each base atom
             base_position = [float(x) for x in history.next().split()]
-            base_atoms.append(images(base_position, cell, rcell))
+            base_atoms.extend(images(base_position, cell, rcell))
         elif 'timestep' in line:
             break
 
@@ -215,11 +212,11 @@ def process(config):
 
     distance_max = config.getfloat('config', 'cutoff')
 
-    # Use squared distances for comparisons so only do sqrt for required atoms
-    dist_max_sq = distance_max*distance_max
-
     total_steps = 0
     seek_index = 0
+
+    # supercell into the kd tree
+    kd_base = KDTree(base_atoms)
 
     for line in history:
         if line.split()[0] == seek_atom:
@@ -232,19 +229,13 @@ def process(config):
                 seek_atom_positions.append(
                     [float(x) for x in history.next().split()])
 
-            # Measure all the distances between pairs of guest atoms and
-            # framework atoms (slower, but then we take the closest if the guest
-            # is close to two!)
-            base_distances = [(dist_max_sq, -1)]
-            for base_idx, base_atom in enumerate(base_atoms):
-                for image in base_atom:
-                    for seek_atom_position in seek_atom_positions:
-                        to_atom = points_to_vector(seek_atom_position, image)
-                        to_atom_dist_sq = length_squared(to_atom)
-                        if to_atom_dist_sq < dist_max_sq:
-                            base_distances.append((to_atom_dist_sq, base_idx))
+            # Look up nearest neighbours in the kdtree
+            kbase_positions = kd_base.query(seek_atom_positions, p=2,
+                                            distance_upper_bound=distance_max)
 
-            nearest_base = sorted(base_distances)[0][1]
+            # join the two lists so we can take the closest
+            knearest = sorted(zip(*kbase_positions))[0]
+
             # Calculate angles between the molecule and each of the coordinate
             # axes
             seek_alignment = points_to_vector(seek_atom_positions[0],
@@ -252,8 +243,12 @@ def process(config):
             angle_x = rad2deg(theta(seek_alignment, [1, 0, 0]))
             angle_y = rad2deg(theta(seek_alignment, [0, 1, 0]))
             angle_z = rad2deg(theta(seek_alignment, [0, 0, 1]))
-            guest_bins[seek_index].append((nearest_base,
+
+            # Supercell is 8 unit cells, get index by floored division
+            guest_bins[seek_index].append((knearest[1]//8,
                                            (angle_x, angle_y, angle_z)))
+
+            # ready for next guest
             seek_index += 1
 
         elif 'timestep' in line:
