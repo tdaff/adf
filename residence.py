@@ -113,7 +113,7 @@ def read_config():
     """
     # Use ConfigParser to deal with piped input file
     config_defaults = {
-        'input_file_name': 'short_hist',
+        'input_file_name': 'HISTORY',
         'output_prefix': 'residence',
         'base_atom': 'In',
         'seek_atom': 'Cx',
