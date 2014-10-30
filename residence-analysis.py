@@ -21,29 +21,12 @@ def number_of_hops(data):
     """
     Records the number of hops per different CO2
     """
-#    CO2_number = 0
-    #output_hop_number = open('hop_data', 'wb')
     for CO2_number, CO2 in enumerate(data):
-#        CO2_number += 1
-#        count = 0
         hop_number = 0
         In_selection = CO2[0][0]
         for timestep in CO2:
-            #print CO2_number, hop_number, In_selection, count, len(CO2)
-#            if count + 1 == len(CO2):
-#                print CO2_number, hop_number
-#            elif In_selection is None:
-#                In_selection = timestep[0]
-#                count += 1
-                #print count
             if In_selection != timestep[0]:
                 hop_number += 1
-#                count += 1
-                #print count
-#            else:
-#                hop_number += 1
-#                count += 1
-                #print count
         print CO2_number, hop_number
 
 def record_angles_for_In(data):
@@ -56,6 +39,17 @@ def record_angles_for_In(data):
     angle_bin = 360/angle_bins_user
     angle_bins = int(math.ceil((angle_max - angle_min)/angle_bin)) + 1
     metal_center_list = range(number_of_metal_centers_user + 1)
+    #Separation of different In centers
+    In1_center_list = (metal_center_list[:8] + metal_center_list[12:20]+ 
+                       metal_center_list[24:32] + metal_center_list[36:44] + 
+                       metal_center_list[48:56] + metal_center_list[60:68] + 
+                       metal_center_list[72:80] + metal_center_list[84:92])
+    In2_center_list = (metal_center_list[8:12] + metal_center_list[20:24] +
+                       metal_center_list[32:36] + metal_center_list[44:48] +
+                       metal_center_list[56:60] + metal_center_list[68:72] +
+                       metal_center_list[80:84] + metal_center_list[92:96])
+    no_center_item = metal_center_list[96]
+    
     bins = [0 for i in range(angle_bins)] 
     metal_center_dict = dict((metal_center,[bins[:], bins[:], bins[:]]) 
                               for metal_center in metal_center_list)
