@@ -70,6 +70,24 @@ def record_angles_for_In(data):
     output_file_In1 = open('In1_xyz_data', 'wb')
     output_file_In2 = open('In2_xyz_data', 'wb')
     output_file_pore = open('pore_xyz_data', 'wb')
+    output_file_x.write("#metal center\ bin," + 
+                         ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                         + "\n")    
+    output_file_y.write("#metal center\ bin," + 
+                        ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                        + "\n")    
+    output_file_z.write("#metal center\ bin," + 
+                         ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                         + "\n")    
+    output_file_In1.write("#metal center\ bin," + 
+                          ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                          + "\n")    
+    output_file_In2.write("#metal center\ bin," + 
+                          ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                          + "\n")    
+    output_file_pore.write("#metal center\ bin," + 
+                           ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)]) 
+                           + "\n")    
     x_In1 = []
     y_In1 = []
     z_In1 = []
