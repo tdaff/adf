@@ -21,12 +21,21 @@ def number_of_hops(data):
     """
     Records the number of hops per different CO2
     """
+    output_file = open('hop_data', 'wb')
+    output_file.write('#CO2 number,')
+    output_file.write('hop number,' + '\n')
+    CO2_num_list = []
     for CO2_number, CO2 in enumerate(data):
+        CO2_num_list.append(CO2_number)
+        print CO2_num_list
         hop_number = 0
         In_selection = CO2[0][0]
         for timestep in CO2:
             if In_selection != timestep[0]:
                 hop_number += 1
+        output_file.write(str(CO2_number) + ',' + str(hop_number) + ',' + '\n')
+        #output_file.write('%s, %s\n' % (
+        #                  str(x,y) for x, y in zip(CO2_num_list, hop_number)))
         #print CO2_number, hop_number
         #Need to include this in a file
 
