@@ -27,7 +27,8 @@ def number_of_hops(data):
         for timestep in CO2:
             if In_selection != timestep[0]:
                 hop_number += 1
-        print CO2_number, hop_number
+        #print CO2_number, hop_number
+        #Need to include this in a file
 
 def record_angles_for_In(data):
     """
@@ -35,8 +36,8 @@ def record_angles_for_In(data):
     angles of all CO2 in proximity to a given In
     """
     angle_min = 0
-    angle_max = 360
-    angle_bin = 360/angle_bins_user
+    angle_max = 180
+    angle_bin = 180/angle_bins_user
     angle_bins = int(math.ceil((angle_max - angle_min)/angle_bin)) + 1
     metal_center_list = range(number_of_metal_centers_user + 1)
     #Separation of different In centers
@@ -66,19 +67,73 @@ def record_angles_for_In(data):
     output_file_x = open('angle_data_x', 'wb')    
     output_file_y = open('angle_data_y', 'wb')
     output_file_z = open('angle_data_z', 'wb')
+    output_file_In1 = open('In1_xyz_data', 'wb')
+    output_file_In2 = open('In2_xyz_data', 'wb')
+    output_file_pore = open('pore_xyz_data', 'wb')
+    x_In1 = []
+    y_In1 = []
+    z_In1 = []
+    x_In2 = []
+    y_In2 = []
+    z_In2 = []
+    x_pore = []
+    y_pore = []
+    z_pore = []
     for key in metal_center_dict:
-        x_string_list = " ".join(str(e) for e in metal_center_dict[key][0])
-        y_string_list = " ".join(str(e) for e in metal_center_dict[key][1])
-        z_string_list = " ".join(str(e) for e in metal_center_dict[key][2]) 
-        metal_plus_angle_x = str(key) + " " + x_string_list
-        metal_plus_angle_y = str(key) + " " + y_string_list
-        metal_plus_angle_z = str(key) + " " + z_string_list    
-        output_file_x.write('%s\n' % metal_plus_angle_x)
-        output_file_y.write('%s\n' % metal_plus_angle_y)
-        output_file_z.write('%s\n' % metal_plus_angle_z) 
-                
+    #In1 center list accumulation for x, y and z of CO2    
+        if key in In1_center_list:
+            if not x_In1:
+                x_In1 = metal_center_dict[key][0]
+                y_In1 = metal_center_dict[key][1]
+                z_In1 = metal_center_dict[key][2]
+            else:
+                x_In1 = [x+a for x, a in zip(x_In1, metal_center_dict[key][0])]
+                y_In1 = [y+a for y, a in zip(y_In1, metal_center_dict[key][1])]
+                z_In1 = [z+a for z, a in zip(z_In1, metal_center_dict[key][2])]
+    #In2 center list accumulation for x, y and z of CO2 
+        elif key in In2_center_list:
+            if not x_In2:
+                x_In2 = metal_center_dict[key][0]
+                y_In2 = metal_center_dict[key][1]
+                z_In2 = metal_center_dict[key][2]
+            else:
+                x_In2 = [x+a for x, a in zip(x_In2, metal_center_dict[key][0])]
+                y_In2 = [y+a for y, a in zip(y_In2, metal_center_dict[key][1])]
+                z_In2 = [z+a for z, a in zip(z_In2, metal_center_dict[key][2])]
+    #Center of pore accumulation of x, y and z of CO2
+        else:
+            x_pore = metal_center_dict[key][0]
+            y_pore = metal_center_dict[key][1]
+            z_pore = metal_center_dict[key][2]
+        
+    In1_x_string_list = ",".join(str(e) for e in x_In1)
+    In1_y_string_list = ",".join(str(e) for e in y_In1)
+    In1_z_string_list = ",".join(str(e) for e in z_In1) 
+    In2_x_string_list = ",".join(str(e) for e in x_In2)
+    In2_y_string_list = ",".join(str(e) for e in y_In2)
+    In2_z_string_list = ",".join(str(e) for e in z_In2)
+    pore_x_string_list = ",".join(str(e) for e in x_pore)
+    pore_y_string_list = ",".join(str(e) for e in y_pore)
+    pore_z_string_list = ",".join(str(e) for e in z_pore)
+    In1_plus_angle_x = 'In1' + "," + In1_x_string_list
+    In1_plus_angle_y = 'In1' + "," + In1_y_string_list
+    In1_plus_angle_z = 'In1' + "," + In1_z_string_list
+    In2_plus_angle_x = 'In2' + "," + In2_x_string_list
+    In2_plus_angle_y = 'In2' + "," + In2_y_string_list
+    In2_plus_angle_z = 'In2' + "," + In2_z_string_list
+    pore_plus_angle_x = 'pore' + "," + pore_x_string_list
+    pore_plus_angle_y = 'pore' + "," + pore_y_string_list
+    pore_plus_angle_z = 'pore' + "," + pore_z_string_list    
+    output_file_x.write('%s\n %s\n %s' % (In1_plus_angle_x, In2_plus_angle_x, pore_plus_angle_x))
+    output_file_y.write('%s\n %s\n %s' % (In1_plus_angle_y, In2_plus_angle_y, pore_plus_angle_y))
+    output_file_z.write('%s\n %s\n %s' % (In1_plus_angle_z, In2_plus_angle_z, pore_plus_angle_z)) 
+    output_file_In1.write('%s\n %s\n %s' % (In1_plus_angle_x, In1_plus_angle_y, In1_plus_angle_z))
+    output_file_In2.write('%s\n %s\n %s' % (In2_plus_angle_x, In2_plus_angle_y, In2_plus_angle_z))
+    output_file_pore.write('%s\n %s\n %s' % (pore_plus_angle_x, pore_plus_angle_y, pore_plus_angle_z))
+
+        
 #User adjustable Variables and Stuff
-angle_bins_user = 360 #number of bins
+angle_bins_user = 180 #number of bins
 number_of_metal_centers_user = 96
 
 #if HISTORY_output is not in the directory, then stop
