@@ -10,9 +10,13 @@ import ConfigParser
 import json
 import math
 import sys
+from itertools import count
 from StringIO import StringIO
 
 from scipy.spatial import KDTree
+
+# Infinity, of course
+INFINITY = float('inf')
 
 
 # define functions first
@@ -229,24 +233,37 @@ def process(config):
                 seek_atom_positions.append(
                     [float(x) for x in history.next().split()])
 
-            # Look up nearest neighbours in the kdtree
+            # Look up nearest neighbours in the kdtree for all seek atoms
+            # returns two lists with one item for each seek atom
+            #  [[distances...], [indexes...]]
             kbase_positions = kd_base.query(seek_atom_positions, p=2,
                                             distance_upper_bound=distance_max)
 
-            # join the two lists so we can take the closest
-            knearest = sorted(zip(*kbase_positions))[0]
+            # join the two lists so we can sort and take the closest,
+            # attach an index to each to identify the closest seek atom.
+            # knear is [[distance to nearest base, base atom index,
+            #               seek atom index], ...] sorted by distance
+            knear = sorted(zip(kbase_positions[0], kbase_positions[1],
+                               count()))
 
-            # Calculate angles between the molecule and each of the coordinate
-            # axes
-            seek_alignment = points_to_vector(seek_atom_positions[0],
-                                              seek_atom_positions[1])
-            angle_x = rad2deg(theta(seek_alignment, [1, 0, 0]))
-            angle_y = rad2deg(theta(seek_alignment, [0, 1, 0]))
-            angle_z = rad2deg(theta(seek_alignment, [0, 0, 1]))
+            # alignment of guest is using closest two atoms, in order
+            seek_alignment = points_to_vector(seek_atom_positions[knear[0][2]],
+                                              seek_atom_positions[knear[1][2]])
+
+            # Check if there is a nearest atom, otherwise in free space
+            if knear[0][0] != INFINITY:
+                reference = points_to_vector(base_atoms[knear[0][1]],
+                                             seek_atom_positions[knear[0][2]])
+            else:
+                # Free space relative to arbitrary axis; do we care anyway?
+                reference = [0, 0, 1]
+
+            # Calculate angles between the molecule and vector to the closest
+            # image of the seek_atoms
+            angle = rad2deg(theta(seek_alignment, reference))
 
             # Supercell is 8 unit cells, get index by floored division
-            guest_bins[seek_index].append((knearest[1]//8,
-                                           (angle_x, angle_y, angle_z)))
+            guest_bins[seek_index].append((knear[0][1]//8, angle))
 
             # ready for next guest
             seek_index += 1
