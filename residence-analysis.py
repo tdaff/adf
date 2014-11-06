@@ -165,6 +165,64 @@ def record_angles_for_In(data):
     output_file_pore.write('%s\n' % pore_plus_angle)
 
 
+def categorise_by_pore(filename='HISTORY'):
+    """
+    Read the first frame from the history file and categorise the CO2 by pore.
+    This is pretty hardcoded for MIL-68 and working in 2d with pre-coded
+    periodic anchor points.
+
+    :param filename: name of the history file to read
+    :return: tuple of lists indexes of guests in triangle pores, and indexes
+             of guests in hexagonal pores. Zero-based indexes.
+
+    """
+
+    # calculated manually, only need x and y as they go along z
+    triangle_centres = [[0, 6.28], [0, -6.28],
+                        [10.89, 12.56], [10.89, -12.56],
+                        [-10.89, 12.56], [-10.89, -12.56],
+                        [21.77, 6.28], [21.77, -6.28],
+                        [-21.77, 6.28], [-21.77, -6.28]]
+    radius = 4.0  # A -> centre of triangle pore to wall
+
+    # Store indexes here
+    triangles = []
+    hexagons = []
+
+    # Don't bother with the header, will not matter if it doesn't contain Cx
+    history = open(filename, 'r')
+    while 'timestep' not in history.readline():
+        # Skip tp timestep so following loop doesn't stop before it starts
+        pass
+
+    # zero based indexes
+    guest_idx = 0
+    for line in history:
+        if line.split()[0] == 'Cx':
+            position = [float(x) for x in history.next().split()]
+            for centre in triangle_centres:
+                distance = ((position[0] - centre[0])**2 +
+                            (position[1] - centre[1])**2)**0.5
+                if distance < radius:
+                    triangles.append(guest_idx)
+                    guest_idx += 1
+                    break
+            else:
+                # Not within radius of triangle
+                hexagons.append(guest_idx)
+                guest_idx += 1
+
+        elif 'timestep' in line:
+            # End of first step, bail out
+            break
+
+    # Print out for checking in VMD. Paste into representations
+    print "index " + " ".join(["%s" % (x*3) for x in triangles])
+    print "index " + " ".join(["%s" % (x*3) for x in hexagons])
+
+    return triangles, hexagons
+
+
 #User adjustable Variables and Stuff
 angle_bins_user = 180  # number of bins
 number_of_metal_centers_user = 96
@@ -176,6 +234,7 @@ if os.path.isfile('HISTORY_out.py'):
     from HISTORY_out import data
 #    execfile("/share/scratch/bprovost/YiningWork2014/MD/MIL-68-In/fixed_T_P_MD/3bar/150K/test-adf-code/HISTORY_out.py")
 #    print data
+    triangle_id, hexagon_id = categorise_by_pore()
     number_of_hops(data)
     record_angles_for_In(data)
 else:
