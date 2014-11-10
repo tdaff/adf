@@ -129,8 +129,8 @@ def record_angles_for_In(data, triangle_id):
                 co2_angle_bin = int((timestep[1]-angle_min)/angle_bin)
                 hex_id_dict[metal_number][co2_angle_bin] += 1
     
-    output_file_tri = open('triangle_angle_data', 'wb')
-    output_file_hex = open('hexagonal_angle_data', 'wb')
+    output_file_tri = open('triangle_angle_data.csv', 'wb')
+    output_file_hex = open('hexagonal_angle_data.csv', 'wb')
     output_file_tri.write("#metal center\ bin," +
                       ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)])
                          + "\n")
@@ -204,10 +204,10 @@ def record_angles_for_In(data, triangle_id):
             co2_angle_bin = int((timestep[1]-angle_min)/angle_bin)
             metal_center_dict[metal_number][co2_angle_bin] += 1
   
-    output_file = open('angle_data', 'wb')
-    output_file_In1 = open('In1_angle_data', 'wb')
-    output_file_In2 = open('In2_angle_data', 'wb')
-    output_file_pore = open('pore_angle_data', 'wb')
+    output_file = open('angle_data.csv', 'wb')
+    output_file_In1 = open('In1_angle_data.csv', 'wb')
+    output_file_In2 = open('In2_angle_data.csv', 'wb')
+    output_file_pore = open('pore_angle_data.csv', 'wb')
     #Make headers for hexagonal & tri pores, then find a way to incorporate in script
     output_file.write("#metal center\ bin," +
                       ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)])
