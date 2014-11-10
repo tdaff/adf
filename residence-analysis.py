@@ -18,21 +18,10 @@ def create_histogram_figure(data, angle_bins, plot_name):
     """
     Creates png file of a histogram plot.
     """
-    # the histogram of the data
-    n, bins, patches = plt.hist(x, bins, normed=1, facecolor='green', alpha=0.5)
-    # add a 'best fit' line
-#    plt.plot(bins, y, 'r--')
-#    plt.xlabel('Angle bins (degrees)')
-#    plt.ylabel('Frequency')
-#    plt.title(plot_name)
-#    plt.savefig('%s.png' % plot_name)
-
-# Tweak spacing to prevent clipping of ylabel
-#plt.subplots_adjust(left=0.15)
-#plt.show()
+    # the histogram of the data, to do
 
 
-def number_of_hops(data):
+def number_of_hops(data, triangle_id):
     """
     Records the number of hops per different CO2
     """
@@ -49,6 +38,7 @@ def number_of_hops(data):
     no_center_item = metal_center_list[96]
     output_file = open('hop_data', 'wb')
     output_file.write('#CO2 number,')
+    output_file.write('pore type,')
     output_file.write('total hop #i,')
     output_file.write('In1 to In1 hop #,')
     output_file.write('In1 to In2 hop #,')
@@ -65,14 +55,10 @@ def number_of_hops(data):
         In2_to_In1_hop_number = 0
         In2_to_In2_hop_number = 0
         In2_In1_to_pore_hop_number = 0
-        #Need to add some if statements for the In center identity
-        print CO2
-        print In_selection
         for timestep in CO2:
             if In_selection != timestep[0]:
                 hop_number += 1
                 In_selection = timestep[0]
-                print In_selection
                 if In_selection in In1_center_list and timestep[0] in In1_center_list:
                     In1_to_In1_hop_number += 1
                 elif In_selection in In1_center_list and timestep[0] in In2_center_list:
@@ -83,12 +69,18 @@ def number_of_hops(data):
                     In2_to_In2_hop_number += 1
                 else:
                     In2_In1_to_pore_hop_number +=1
-        output_file.write(str(CO2_number) + ',' + str(hop_number) + ',' + str(In1_to_In1_hop_number) +
-                          ',' + str(In1_to_In2_hop_number) + ',' + str(In2_to_In1_hop_number) + ',' +
-                          str(In2_to_In2_hop_number) + ',' + str(In2_In1_to_pore_hop_number) + ',' + '\n')
+        if CO2_number in triangle_id:
+            output_file.write(str(CO2_number) + ',' + 'tri,' + str(hop_number) + ',' + str(In1_to_In1_hop_number) +
+                              ',' + str(In1_to_In2_hop_number) + ',' + str(In2_to_In1_hop_number) + ',' +
+                              str(In2_to_In2_hop_number) + ',' + str(In2_In1_to_pore_hop_number) + ',' + '\n')
+        else:
+            output_file.write(str(CO2_number) + ',' + 'hex,' + str(hop_number) + ',' + str(In1_to_In1_hop_number) +
+                              ',' + str(In1_to_In2_hop_number) + ',' + str(In2_to_In1_hop_number) + ',' +
+                              str(In2_to_In2_hop_number) + ',' + str(In2_In1_to_pore_hop_number) + ',' + '\n')
+  
 
 
-def record_angles_for_In(data):
+def record_angles_for_In(data, triangle_id):
     """
     Records the angles of CO2 at each In and bins accordingly to keep a record of
     angles of all CO2 in proximity to a given In
@@ -112,15 +104,111 @@ def record_angles_for_In(data):
     bins = [0 for i in range(angle_bins)]
     metal_center_dict = dict((metal_center, bins[:])
                              for metal_center in metal_center_list)
-    for CO2 in data:
+    tri_id_dict = dict((metal_center, bins[:])
+                             for metal_center in metal_center_list)
+    hex_id_dict = dict((metal_center, bins[:])
+                             for metal_center in metal_center_list)
+
+    output_file_pore = open('triangle_angle_data', 'wb')
+    output_file_pore = open('hexagonal_angle_data', 'wb')
+    triangle_id_timesteps = []
+    hexagonal_id_timesteps = []
+    for CO2_number, CO2 in enumerate(data):
+        #Stuff for triangular & hexagonal pore separation
+        # Each file will include In1, In2 and pore specific info
+        if CO2_number in triangle_id:
+            for timestep in CO2:
+                triangle_id_timesteps.append(timestep)
+                metal_number = timestep[0]
+                co2_angle_bin = int((timestep[1]-angle_min)/angle_bin)
+                tri_id_dict[metal_number][co2_angle_bin] += 1
+        else:
+            for timestep in CO2:
+                hexagonal_id_timesteps.append(timestep)
+                metal_number = timestep[0]
+                co2_angle_bin = int((timestep[1]-angle_min)/angle_bin)
+                hex_id_dict[metal_number][co2_angle_bin] += 1
+    
+    output_file_tri = open('triangle_angle_data', 'wb')
+    output_file_hex = open('hexagonal_angle_data', 'wb')
+    output_file_tri.write("#metal center\ bin," +
+                      ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)])
+                         + "\n")
+    output_file_hex.write("#metal center\ bin," +
+                          ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)])
+                          + "\n")
+    In1_tri = []
+    In2_tri = []
+    pore_tri = []
+    In1_hex = []
+    In2_hex = []
+    pore_hex = []
+
+    #Triangular pore stuff
+    for key in tri_id_dict:
+    #In1 center list accumulation for vector to CO2
+        if key in In1_center_list:
+            if not In1_tri:
+                In1_tri = tri_id_dict[key]
+            else:
+                In1_tri = [x+a for x, a in zip(In1_tri, tri_id_dict[key])]
+    #In2 center list accumulation for vector to CO2
+        elif key in In2_center_list:
+            if not In2_tri:
+                In2_tri = tri_id_dict[key]
+            else:
+                In2_tri = [x+a for x, a in zip(In2_tri, tri_id_dict[key])]
+    #Center of pore accumulation of vector to CO2
+        else:
+            pore_tri = tri_id_dict[key]
+
+    #Hexagonal pore stuff
+    for key in hex_id_dict:
+    #In1 center list accumulation for vector to CO2
+        if key in In1_center_list:
+            if not In1_hex:
+                In1_hex = hex_id_dict[key]
+            else:
+                In1_hex = [x+a for x, a in zip(In1_hex, hex_id_dict[key])]
+    #In2 center list accumulation for vector to CO2
+        elif key in In2_center_list:
+            if not In2_hex:
+                In2_hex = hex_id_dict[key]
+            else:
+                In2_hex = [x+a for x, a in zip(In2_hex, hex_id_dict[key])]
+    #Center of pore accumulation of vector to CO2
+        else:
+            pore_hex = hex_id_dict[key]
+
+    tri_In1_string_list = ",".join(str(e) for e in In1_tri)
+    tri_In2_string_list = ",".join(str(e) for e in In2_tri)
+    tri_pore_string_list = ",".join(str(e) for e in pore_tri)
+    hex_In1_string_list = ",".join(str(e) for e in In1_hex)
+    hex_In2_string_list = ",".join(str(e) for e in In2_hex)
+    hex_pore_string_list = ",".join(str(e) for e in pore_hex)
+    tri_In1_plus_angle = 'In1' + "," + tri_In1_string_list
+    tri_In2_plus_angle = 'In2' + "," + tri_In2_string_list
+    tri_pore_plus_angle = 'pore' + "," + tri_pore_string_list
+    hex_In1_plus_angle = 'In1' + "," + hex_In1_string_list
+    hex_In2_plus_angle = 'In2' + "," + hex_In2_string_list
+    hex_pore_plus_angle = 'pore' + "," + hex_pore_string_list
+    output_file_tri.write('%s\n %s\n %s\n' % (tri_In1_plus_angle, tri_In2_plus_angle, tri_pore_plus_angle))
+    output_file_hex.write('%s\n %s\n %s\n' % (hex_In1_plus_angle, hex_In2_plus_angle, hex_pore_plus_angle))
+
+        #Stuff which ignores triangular & hexagonal pores
+        #Purely for In1, In2 and free in the pore
+       
+    for CO2_number, CO2 in enumerate(data):
         for timestep in CO2:
             metal_number = timestep[0]
             co2_angle_bin = int((timestep[1]-angle_min)/angle_bin)
             metal_center_dict[metal_number][co2_angle_bin] += 1
+  
     output_file = open('angle_data', 'wb')
     output_file_In1 = open('In1_angle_data', 'wb')
     output_file_In2 = open('In2_angle_data', 'wb')
     output_file_pore = open('pore_angle_data', 'wb')
+    #Make headers for hexagonal & tri pores, then find a way to incorporate in script
     output_file.write("#metal center\ bin," +
                       ",".join(["%s" % x for x in range(0, angle_bins, angle_bin)])
                          + "\n")
@@ -137,19 +225,19 @@ def record_angles_for_In(data):
     In2 = []
     pore = []
     for key in metal_center_dict:
-    #In1 center list accumulation for x, y and z of CO2
+    #In1 center list accumulation for vector to CO2
         if key in In1_center_list:
             if not In1:
                 In1 = metal_center_dict[key]
             else:
                 In1 = [x+a for x, a in zip(In1, metal_center_dict[key])]
-    #In2 center list accumulation for x, y and z of CO2
+    #In2 center list accumulation for vector to CO2
         elif key in In2_center_list:
             if not In2:
                 In2 = metal_center_dict[key]
             else:
                 In2 = [x+a for x, a in zip(In2, metal_center_dict[key])]
-    #Center of pore accumulation of x, y and z of CO2
+    #Center of pore accumulation of vector to CO2
         else:
             pore = metal_center_dict[key]
 
@@ -217,8 +305,9 @@ def categorise_by_pore(filename='HISTORY'):
             break
 
     # Print out for checking in VMD. Paste into representations
-    print "index " + " ".join(["%s" % (x*3) for x in triangles])
-    print "index " + " ".join(["%s" % (x*3) for x in hexagons])
+    #print "index " + " ".join(["%s" % (x*3) for x in triangles])
+    #print "starting hexagonal pore stuff...\n"
+    #print "index " + " ".join(["%s" % (x*3) for x in hexagons])
 
     return triangles, hexagons
 
@@ -228,15 +317,13 @@ angle_bins_user = 180  # number of bins
 number_of_metal_centers_user = 96
 
 #if HISTORY_output is not in the directory, then stop
-
 if os.path.isfile('HISTORY_out.py'):
     sys.path.insert(1, os.getcwd())
     from HISTORY_out import data
-#    execfile("/share/scratch/bprovost/YiningWork2014/MD/MIL-68-In/fixed_T_P_MD/3bar/150K/test-adf-code/HISTORY_out.py")
-#    print data
     triangle_id, hexagon_id = categorise_by_pore()
-    number_of_hops(data)
-    record_angles_for_In(data)
+    # list of triangular pore and hexagonal pore CO2 indices
+    number_of_hops(data, triangle_id)
+    record_angles_for_In(data, triangle_id)
 else:
     print("output file not found.")
     raise SystemExit
