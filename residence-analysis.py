@@ -31,10 +31,21 @@ def number_of_hops(data, triangle_id):
                        metal_center_list[24:32] + metal_center_list[36:44] +
                        metal_center_list[48:56] + metal_center_list[60:68] +
                        metal_center_list[72:80] + metal_center_list[84:92])
+
     In2_center_list = (metal_center_list[8:12] + metal_center_list[20:24] +
                        metal_center_list[32:36] + metal_center_list[44:48] +
                        metal_center_list[56:60] + metal_center_list[68:72] +
                        metal_center_list[80:84] + metal_center_list[92:96])
+
+    layer_1 = (12, 15, 16, 19, 20, 22, 60, 63, 64, 67, 68, 70)
+    layer_2 = (13, 14, 17, 18, 21, 23, 61, 62, 65, 66, 69, 71)
+    layer_3 = (0, 3, 4, 7, 8, 10, 48, 51, 52, 55, 56, 58)    
+    layer_4 = (1, 2, 5, 6, 9, 11, 49, 50, 53, 54, 57, 59)    
+    layer_5 = (36, 39, 40, 43, 44, 46, 84, 87, 88, 91, 92, 94)
+    layer_6 = (37, 38, 41, 42, 45, 47, 85, 86, 89, 90, 93, 95)
+    layer_7 = (24, 27, 28, 31, 32, 34, 72, 75, 76, 79, 80, 82)
+    layer_8 = (25, 26, 29, 30, 33, 35, 73, 74, 77, 78, 81, 83)
+
     no_center_item = metal_center_list[96]
     output_file = open('hop_data', 'wb')
     output_file.write('#CO2 number,')
